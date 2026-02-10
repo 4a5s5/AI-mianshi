@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./backend
+    container_name: ai-interview-backend
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/interview.db
+    networks:
+      - ai-interview
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: ai-interview-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ai-interview
+    restart: unless-stopped
+
+networks:
+  ai-interview:
+    driver: bridge

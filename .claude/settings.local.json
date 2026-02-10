@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ace-tool__enhance_prompt",
+      "mcp__ace-tool__search_context",
+      "Bash(dir:*)",
+      "Bash(npm run build)",
+      "Bash(python -m py_compile app/main.py)",
+      "Bash(npx @fission-ai/openspec:*)",
+      "Bash(C:/Users/user/.claude/bin/codeagent-wrapper.exe:*)",
+      "Bash(findstr:*)",
+      "Bash(python:*)",
+      "Bash(npx tsc:*)",
+      "Bash(openspec archive:*)",
+      "Bash(C:/Users/user/.claude/bin/openspec.exe archive:*)",
+      "Bash(where:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist:*)",
+      "Bash(openspec new:*)",
+      "Bash(npx vite:*)"
+    ]
+  }
+}
