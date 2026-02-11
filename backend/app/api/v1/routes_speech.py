@@ -24,6 +24,7 @@ async def get_speech_config(
             "provider": "web_speech",
             "whisper_api_url": None,
             "whisper_api_key": None,
+            "whisper_model": "whisper-1",
             "is_active": True
         }
     return {
@@ -31,6 +32,7 @@ async def get_speech_config(
         "provider": config.provider,
         "whisper_api_url": config.whisper_api_url,
         "whisper_api_key": "***" if config.whisper_api_key else None,  # 脱敏
+        "whisper_model": config.whisper_model or "whisper-1",
         "is_active": config.is_active
     }
 
@@ -48,7 +50,8 @@ async def update_speech_config(
         config = SpeechConfig(
             provider=data.provider or "web_speech",
             whisper_api_url=data.whisper_api_url,
-            whisper_api_key=data.whisper_api_key
+            whisper_api_key=data.whisper_api_key,
+            whisper_model=data.whisper_model
         )
         db.add(config)
     else:
@@ -58,6 +61,8 @@ async def update_speech_config(
             config.whisper_api_url = data.whisper_api_url
         if data.whisper_api_key is not None and data.whisper_api_key != "***":
             config.whisper_api_key = data.whisper_api_key
+        if data.whisper_model is not None:
+            config.whisper_model = data.whisper_model
 
     await db.commit()
     await db.refresh(config)
@@ -107,7 +112,7 @@ async def transcribe_audio(
                     "file": (filename, audio_content, content_type)
                 },
                 data={
-                    "model": "whisper-1",
+                    "model": config.whisper_model or "whisper-1",
                     "language": "zh",
                     "response_format": "json"
                 }

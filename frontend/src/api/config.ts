@@ -25,6 +25,7 @@ export interface SpeechConfig {
   provider: string
   whisper_api_url?: string
   whisper_api_key?: string
+  whisper_model?: string
   is_active: boolean
   updated_at: string
 }
@@ -84,6 +85,7 @@ export const speechApi = {
     provider: string
     whisper_api_url?: string
     whisper_api_key?: string
+    whisper_model?: string
   }) {
     return request.put<any, SpeechConfig>('/speech/config', data)
   }

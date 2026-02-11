@@ -64,12 +64,14 @@ class SpeechConfigBase(BaseModel):
     provider: str  # "web_speech" | "whisper"
     whisper_api_url: Optional[str] = None
     whisper_api_key: Optional[str] = None
+    whisper_model: Optional[str] = None
 
 
 class SpeechConfigUpdate(BaseModel):
     provider: Optional[str] = None
     whisper_api_url: Optional[str] = None
     whisper_api_key: Optional[str] = None
+    whisper_model: Optional[str] = None
 
 
 class SpeechConfigResponse(SpeechConfigBase):

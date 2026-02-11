@@ -20,6 +20,7 @@ export function useRecorder() {
   let mediaRecorder: MediaRecorder | null = null
   let audioChunks: Blob[] = []
   let startTime: number = 0
+  let sessionBaseText: string = ''
 
   // 检查浏览器支持
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -40,6 +41,10 @@ export function useRecorder() {
       recognition.interimResults = true
       recognition.lang = 'zh-CN'
 
+      // 保存当前文本框内容作为基础文本
+      sessionBaseText = transcript.value
+      let sessionFinalText = ''
+
       recognition.onstart = () => {
         isRecording.value = true
         startTime = Date.now()
@@ -47,21 +52,21 @@ export function useRecorder() {
       }
 
       recognition.onresult = (event) => {
-        let finalTranscript = ''
         let interimTranscript = ''
 
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        // 重新构建当前session的所有final结果
+        sessionFinalText = ''
+        for (let i = 0; i < event.results.length; i++) {
           const result = event.results[i]
           if (result.isFinal) {
-            finalTranscript += result[0].transcript
+            sessionFinalText += result[0].transcript
           } else {
             interimTranscript += result[0].transcript
           }
         }
 
-        if (finalTranscript) {
-          transcript.value += finalTranscript
-        }
+        // 追加到基础文本之后
+        transcript.value = sessionBaseText + sessionFinalText + interimTranscript
       }
 
       recognition.onerror = (event) => {
@@ -70,6 +75,8 @@ export function useRecorder() {
       }
 
       recognition.onend = () => {
+        // 确保最终文本只包含 final 结果（不含 interim）
+        transcript.value = sessionBaseText + sessionFinalText
         isRecording.value = false
       }
 
@@ -115,6 +122,7 @@ export function useRecorder() {
         mimeType: 'audio/webm;codecs=opus'
       })
       audioChunks = []
+      sessionBaseText = transcript.value
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -167,7 +175,7 @@ export function useRecorder() {
               }
             )
 
-            transcript.value = response.transcript
+            transcript.value = sessionBaseText + response.transcript
             resolve({ transcript: response.transcript, duration })
           } catch (e: unknown) {
             const axiosError = e as { response?: { data?: { detail?: string } } }
@@ -188,7 +196,6 @@ export function useRecorder() {
   // 开始录音
   async function start(): Promise<void> {
     error.value = null
-    transcript.value = ''
 
     const provider = appStore.speechConfig?.provider || 'web_speech'
 

@@ -119,6 +119,12 @@
           <el-form-item label="API Key">
             <el-input v-model="whisperKey" type="password" show-password />
           </el-form-item>
+          <el-form-item label="模型名称">
+            <el-input v-model="whisperModel" placeholder="whisper-1" />
+            <div class="form-tip">
+              OpenAI 使用 whisper-1，Groq 使用 whisper-large-v3-turbo 等，请根据服务商填写。
+            </div>
+          </el-form-item>
           <el-button type="primary" @click="saveSpeechConfig">保存</el-button>
         </template>
       </el-form>
@@ -257,6 +263,7 @@ const availableModels = ref<string[]>([])
 const speechProvider = ref('web_speech')
 const whisperUrl = ref('')
 const whisperKey = ref('')
+const whisperModel = ref('whisper-1')
 
 // 导入设置
 const maxImportChars = ref(30000)
@@ -299,6 +306,7 @@ async function loadSpeechConfig() {
     speechProvider.value = config.provider
     whisperUrl.value = config.whisper_api_url || ''
     whisperKey.value = config.whisper_api_key || ''
+    whisperModel.value = config.whisper_model || 'whisper-1'
   } catch (e) {
     console.error('加载语音配置失败', e)
   }
@@ -452,7 +460,8 @@ async function saveSpeechConfig() {
     await speechApi.updateConfig({
       provider: speechProvider.value,
       whisper_api_url: whisperUrl.value || undefined,
-      whisper_api_key: whisperKey.value || undefined
+      whisper_api_key: whisperKey.value || undefined,
+      whisper_model: whisperModel.value || undefined
     })
     ElMessage.success('保存成功')
     appStore.loadSpeechConfig()

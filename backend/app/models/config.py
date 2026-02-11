@@ -52,5 +52,6 @@ class SpeechConfig(Base):
     provider = Column(String(20), nullable=False)  # "web_speech" | "whisper"
     whisper_api_url = Column(String(500), nullable=True)
     whisper_api_key = Column(String(500), nullable=True)
+    whisper_model = Column(String(100), nullable=True, default="whisper-1")
     is_active = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

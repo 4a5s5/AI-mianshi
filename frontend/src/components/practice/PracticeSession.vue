@@ -103,9 +103,9 @@ const transcript = ref('')
 
 const formattedTime = computed(() => timer.formatted.value)
 
-// 实时同步识别文本
+// 实时同步识别文本（useRecorder 已经处理了追加逻辑）
 watch(() => recorder.transcript.value, (val) => {
-  if (val && isRecording.value) {
+  if (val !== undefined && isRecording.value) {
     transcript.value = val
   }
 })
@@ -130,9 +130,8 @@ async function toggleRecording() {
     const result = await recorder.stop()
     isRecording.value = false
     timer.stop()
-    if (result.transcript) {
-      transcript.value = result.transcript
-    }
+    // recorder 内部已经处理了文本追加，直接同步最终值
+    transcript.value = recorder.transcript.value
   }
 }
 
@@ -146,9 +145,7 @@ async function submitAnswer() {
     const result = await recorder.stop()
     isRecording.value = false
     timer.stop()
-    if (result.transcript) {
-      transcript.value = result.transcript
-    }
+    transcript.value = recorder.transcript.value
   }
 
   emit('complete', {
