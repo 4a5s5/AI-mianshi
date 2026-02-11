@@ -204,9 +204,10 @@ async def stream_analysis(
             return_existing(),
             media_type="text/event-stream",
             headers={
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-cache, no-store, no-transform",
                 "X-Accel-Buffering": "no",
                 "Connection": "keep-alive",
+                "Content-Encoding": "none",
             }
         )
 
@@ -269,9 +270,10 @@ async def stream_analysis(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, no-transform",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
+            "Content-Encoding": "none",
         }
     )
 
@@ -484,8 +486,9 @@ async def stream_paper_analysis(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, no-transform",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
+            "Content-Encoding": "none",
         }
     )
