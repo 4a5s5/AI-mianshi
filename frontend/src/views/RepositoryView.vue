@@ -141,16 +141,16 @@
     </el-dialog>
 
     <!-- 导入弹窗 -->
-    <el-dialog v-model="showImportDialog" title="导入题库" width="90%" style="max-width: 600px" @close="resetImport">
+    <el-dialog v-model="showImportDialog" title="导入题库" width="90%" style="max-width: 600px" @close="resetImport" :close-on-click-modal="!importing">
       <el-form label-position="top">
         <el-form-item label="导入类型">
-          <el-radio-group v-model="importType">
+          <el-radio-group v-model="importType" :disabled="importing">
             <el-radio label="single">单题导入</el-radio>
             <el-radio label="paper">套卷导入</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="导入方式">
-          <el-radio-group v-model="importMode">
+          <el-radio-group v-model="importMode" :disabled="importing">
             <el-radio label="file">文件上传</el-radio>
             <el-radio label="text">文本输入</el-radio>
           </el-radio-group>
@@ -159,11 +159,13 @@
           <el-upload
             ref="uploadRef"
             :auto-upload="false"
-            :limit="1"
+            multiple
             accept=".txt,.pdf"
             :on-change="handleFileChange"
+            :on-remove="handleFileRemove"
+            :disabled="importing"
           >
-            <el-button>选择文件 (TXT/PDF)</el-button>
+            <el-button :disabled="importing">选择文件 (TXT/PDF，可多选)</el-button>
           </el-upload>
         </el-form-item>
         <el-form-item v-else label="文本内容">
@@ -172,18 +174,39 @@
             type="textarea"
             :rows="10"
             placeholder="请粘贴题目内容..."
+            :disabled="importing"
           />
         </el-form-item>
       </el-form>
+
+      <!-- 多文件导入进度 -->
+      <div v-if="importTasks.length > 0" class="import-progress">
+        <h4>导入进度</h4>
+        <div v-for="(task, index) in importTasks" :key="index" class="import-task-item">
+          <div class="import-task-info">
+            <span class="import-task-name">{{ task.fileName }}</span>
+            <el-tag
+              :type="task.status === 'success' ? 'success' : task.status === 'failed' ? 'danger' : task.status === 'processing' ? '' : 'info'"
+              size="small"
+            >
+              {{ task.status === 'pending' ? '等待中' : task.status === 'uploading' ? '上传中' : task.status === 'processing' ? '处理中' : task.status === 'success' ? '成功' : '失败' }}
+            </el-tag>
+          </div>
+          <div v-if="task.message" class="import-task-message" :class="{ error: task.status === 'failed' }">
+            {{ task.message }}
+          </div>
+        </div>
+      </div>
+
       <template #footer>
-        <el-button @click="showImportDialog = false">取消</el-button>
+        <el-button @click="showImportDialog = false" :disabled="importing">取消</el-button>
         <el-button
           type="primary"
           @click="doImport"
           :loading="importing"
-          :disabled="importMode === 'file' ? !importFile : !importTextContent.trim()"
+          :disabled="importMode === 'file' ? importFiles.length === 0 : !importTextContent.trim()"
         >
-          开始导入
+          {{ importing ? '导入中...' : '开始导入' }}
         </el-button>
       </template>
     </el-dialog>
@@ -233,11 +256,19 @@ const showImportDialog = ref(false)
 const editingQuestion = ref<Question | null>(null)
 const viewingQuestion = ref<Question | null>(null)
 const importType = ref('single')
-const importFile = ref<File | null>(null)
+const importFiles = ref<File[]>([])
 const importMode = ref('file')
 const importTextContent = ref('')
 const showTimeLimitDialog = ref(false)
 const practiceTimeLimit = ref(15)
+
+// 多文件导入任务状态
+interface ImportTaskStatus {
+  fileName: string
+  status: 'pending' | 'uploading' | 'processing' | 'success' | 'failed'
+  message: string
+}
+const importTasks = ref<ImportTaskStatus[]>([])
 
 const questionForm = reactive({
   category: '',
@@ -346,91 +377,140 @@ function closeAddDialog() {
 
 // 处理文件选择
 function handleFileChange(file: { raw: File }) {
-  importFile.value = file.raw
+  importFiles.value.push(file.raw)
+}
+
+// 处理文件移除
+function handleFileRemove(file: { raw: File }) {
+  const index = importFiles.value.indexOf(file.raw)
+  if (index > -1) {
+    importFiles.value.splice(index, 1)
+  }
+}
+
+// 等待单个导入任务完成
+async function waitForImportTask(importId: number): Promise<{ success: boolean; message: string }> {
+  const maxAttempts = 300
+  let attempts = 0
+
+  return new Promise((resolve) => {
+    const poll = async () => {
+      try {
+        const status = await importApi.getStatus(importId)
+        if (status.status === 'success') {
+          resolve({ success: true, message: status.result_summary || '导入成功' })
+        } else if (status.status === 'failed') {
+          resolve({ success: false, message: status.error_message || '导入失败' })
+        } else if (attempts < maxAttempts) {
+          attempts++
+          setTimeout(poll, 1000)
+        } else {
+          resolve({ success: false, message: '导入超时，请在导入历史中查看结果' })
+        }
+      } catch {
+        resolve({ success: false, message: '查询导入状态失败' })
+      }
+    }
+    poll()
+  })
 }
 
 // 执行导入
 async function doImport() {
   importing.value = true
+  importTasks.value = []
+
   try {
-    let result
     if (importMode.value === 'text') {
+      // 文本模式：单次导入，逻辑不变
       if (!importTextContent.value.trim()) {
         ElMessage.warning('请输入文本内容')
+        importing.value = false
         return
       }
-      result = await importApi.importText(importTextContent.value, importType.value)
+      importTasks.value = [{ fileName: '文本导入', status: 'uploading', message: '' }]
+      const result = await importApi.importText(importTextContent.value, importType.value)
+      importTasks.value[0].status = 'processing'
+      const taskResult = await waitForImportTask(result.import_id)
+      importTasks.value[0].status = taskResult.success ? 'success' : 'failed'
+      importTasks.value[0].message = taskResult.message
+      if (taskResult.success) {
+        loadQuestions()
+      }
     } else {
-      if (!importFile.value) {
+      // 文件模式：串行逐文件上传+等待
+      if (importFiles.value.length === 0) {
         ElMessage.warning('请选择文件')
+        importing.value = false
         return
       }
-      if (importType.value === 'single') {
-        result = await importApi.importSingle(importFile.value)
+
+      // 初始化所有任务状态
+      importTasks.value = importFiles.value.map(f => ({
+        fileName: f.name,
+        status: 'pending' as const,
+        message: ''
+      }))
+
+      let successCount = 0
+      let failCount = 0
+
+      // 串行处理每个文件
+      for (let i = 0; i < importFiles.value.length; i++) {
+        const file = importFiles.value[i]
+        importTasks.value[i].status = 'uploading'
+
+        try {
+          let result
+          if (importType.value === 'single') {
+            result = await importApi.importSingle(file)
+          } else {
+            result = await importApi.importPaper(file)
+          }
+
+          importTasks.value[i].status = 'processing'
+
+          // 等待后台处理完成
+          const taskResult = await waitForImportTask(result.import_id)
+          importTasks.value[i].status = taskResult.success ? 'success' : 'failed'
+          importTasks.value[i].message = taskResult.message
+
+          if (taskResult.success) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (e) {
+          importTasks.value[i].status = 'failed'
+          importTasks.value[i].message = '上传失败'
+          failCount++
+        }
+      }
+
+      // 汇总结果
+      if (successCount > 0) {
+        loadQuestions()
+      }
+      if (failCount === 0) {
+        ElMessage.success(`全部 ${successCount} 个文件导入成功`)
+      } else if (successCount === 0) {
+        ElMessage.error(`全部 ${failCount} 个文件导入失败`)
       } else {
-        result = await importApi.importPaper(importFile.value)
+        ElMessage.warning(`${successCount} 个成功，${failCount} 个失败`)
       }
     }
-
-    ElMessage.success('导入任务已提交，正在后台处理...')
-    showImportDialog.value = false
-
-    // 轮询检查导入状态
-    pollImportStatus(result.import_id)
   } catch (e) {
     console.error('导入失败', e)
   } finally {
     importing.value = false
-    importFile.value = null
-    importTextContent.value = ''
   }
-}
-
-// 轮询导入状态
-async function pollImportStatus(importId: number) {
-  const maxAttempts = 300 // 最多等待 5 分钟
-  let attempts = 0
-
-  const poll = async () => {
-    try {
-      const status = await importApi.getStatus(importId)
-
-      if (status.status === 'success') {
-        ElMessage.success(status.result_summary || '导入成功')
-        loadQuestions()
-      } else if (status.status === 'failed') {
-        ElMessage.error(status.error_message || '导入失败')
-      } else if (attempts < maxAttempts) {
-        attempts++
-        setTimeout(poll, 1000)
-      } else {
-        // 超时后再查一次最终状态
-        try {
-          const finalStatus = await importApi.getStatus(importId)
-          if (finalStatus.status === 'success') {
-            ElMessage.success(finalStatus.result_summary || '导入成功')
-            loadQuestions()
-          } else if (finalStatus.status === 'failed') {
-            ElMessage.error(finalStatus.error_message || '导入失败')
-          } else {
-            ElMessage.warning('导入仍在处理中，请稍后在导入历史中查看结果')
-          }
-        } catch {
-          ElMessage.warning('导入超时，请稍后在导入历史中查看结果')
-        }
-      }
-    } catch (e) {
-      console.error('查询导入状态失败', e)
-    }
-  }
-
-  poll()
 }
 
 // 重置导入弹窗
 function resetImport() {
-  importFile.value = null
+  importFiles.value = []
   importTextContent.value = ''
+  importTasks.value = []
 }
 
 // 处理表格选择变化
@@ -520,6 +600,53 @@ onMounted(() => {
 .detail-item p {
   line-height: 1.8;
   color: #303133;
+}
+
+.import-progress {
+  margin-top: 15px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.import-progress h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.import-task-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.import-task-item:last-child {
+  border-bottom: none;
+}
+
+.import-task-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.import-task-name {
+  font-size: 13px;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.import-task-message {
+  font-size: 12px;
+  color: #67c23a;
+  margin-top: 4px;
+}
+
+.import-task-message.error {
+  color: #f56c6c;
 }
 
 @media (max-width: 768px) {
