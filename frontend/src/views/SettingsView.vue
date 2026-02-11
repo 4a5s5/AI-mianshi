@@ -84,11 +84,35 @@
         <el-form-item label="转写方式">
           <el-radio-group v-model="speechProvider" @change="saveSpeechConfig">
             <el-radio label="web_speech">浏览器语音识别 (免费)</el-radio>
-            <el-radio label="whisper">OpenAI Whisper API</el-radio>
+            <el-radio label="whisper">Whisper API (推荐)</el-radio>
           </el-radio-group>
         </el-form-item>
 
+        <el-alert
+          v-if="speechProvider === 'web_speech'"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 15px"
+        >
+          <template #title>
+            浏览器语音识别依赖 Google 服务，中国大陆网络环境下无法使用。
+            建议切换到 Whisper API，转写在服务器端完成，不受网络限制。
+          </template>
+        </el-alert>
+
         <template v-if="speechProvider === 'whisper'">
+          <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 15px"
+          >
+            <template #title>
+              Whisper API 在服务器端执行转写，支持任何 OpenAI 兼容的语音识别接口。
+              服务器部署在海外时可直接使用 OpenAI 官方 API。
+            </template>
+          </el-alert>
           <el-form-item label="Whisper API URL">
             <el-input v-model="whisperUrl" placeholder="https://api.openai.com/v1" />
           </el-form-item>

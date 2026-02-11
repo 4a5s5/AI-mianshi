@@ -46,6 +46,9 @@
     <!-- 转写文本 -->
     <div class="transcript-section">
       <h4>作答内容</h4>
+      <div v-if="recorder.isTranscribing.value" class="transcribing-hint">
+        正在转写语音，请稍候...
+      </div>
       <el-input
         v-model="transcript"
         type="textarea"
@@ -69,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Microphone, VideoPause, Back } from '@element-plus/icons-vue'
 import { useTimer } from '@/composables/useTimer'
@@ -99,6 +102,20 @@ const isRecording = ref(false)
 const transcript = ref('')
 
 const formattedTime = computed(() => timer.formatted.value)
+
+// 实时同步识别文本
+watch(() => recorder.transcript.value, (val) => {
+  if (val && isRecording.value) {
+    transcript.value = val
+  }
+})
+
+// 监听录音错误
+watch(() => recorder.error.value, (err) => {
+  if (err) {
+    ElMessage.error(err)
+  }
+})
 
 async function toggleRecording() {
   if (!isRecording.value) {
@@ -240,6 +257,18 @@ onMounted(() => {
 .transcript-section h4 {
   margin-bottom: 10px;
   color: #606266;
+}
+
+.transcribing-hint {
+  color: #e6a23c;
+  font-size: 14px;
+  margin-bottom: 8px;
+  animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .action-buttons {
