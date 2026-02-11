@@ -10,7 +10,7 @@ from .models.question import Question
 from .models.paper import Paper, PaperItem
 from .models.answer import Answer
 from .models.analysis import AnalysisResult
-from .models.config import ModelConfig, Prompt, SpeechConfig
+from .models.config import ModelConfig, Prompt, SpeechConfig, SystemConfig
 from .models.import_task import ImportTask
 
 # 导入路由

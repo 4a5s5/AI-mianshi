@@ -6,7 +6,7 @@ from openai import AsyncOpenAI, APITimeoutError, APIConnectionError, APIError
 class AIClient:
     """统一的 AI 调用封装，支持 OpenAI 兼容格式"""
 
-    def __init__(self, base_url: str, api_key: str, model_name: str, timeout: int = 60):
+    def __init__(self, base_url: str, api_key: str, model_name: str, timeout: int = 120):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model_name = model_name

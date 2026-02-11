@@ -10,6 +10,10 @@ export interface ImportTask {
   created_at: string
 }
 
+export interface ImportSettings {
+  max_import_chars: number
+}
+
 export const importApi = {
   importSingle(file: File) {
     const formData = new FormData()
@@ -37,11 +41,27 @@ export const importApi = {
     )
   },
 
+  importText(content: string, importType: string = 'single') {
+    return request.post<any, { message: string; import_id: number; file_name: string }>(
+      '/import/text',
+      { content, import_type: importType },
+      { timeout: 60000 }
+    )
+  },
+
   getStatus(importId: number) {
     return request.get<any, ImportTask>(`/import/status/${importId}`)
   },
 
   getHistory() {
     return request.get<any, ImportTask[]>('/import/history')
+  },
+
+  getSettings() {
+    return request.get<any, ImportSettings>('/import/settings')
+  },
+
+  updateSettings(data: { max_import_chars: number }) {
+    return request.put<any, ImportSettings>('/import/settings', data)
   }
 }

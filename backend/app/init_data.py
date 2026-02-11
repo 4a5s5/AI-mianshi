@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from .core.database import async_session_maker
-from .models.config import Prompt, SpeechConfig
+from .models.config import Prompt, SpeechConfig, SystemConfig
 
 # 默认提示词模板
 DEFAULT_PROMPTS = [
@@ -248,5 +248,18 @@ async def init_default_prompts():
                 is_active=True
             )
             db.add(speech_config)
+
+        await db.commit()
+
+        # 初始化系统配置
+        default_sys_configs = [
+            {"key": "max_import_chars", "value": "30000"},
+        ]
+        for cfg in default_sys_configs:
+            result = await db.execute(
+                select(SystemConfig).where(SystemConfig.key == cfg["key"])
+            )
+            if not result.scalar_one_or_none():
+                db.add(SystemConfig(**cfg))
 
         await db.commit()

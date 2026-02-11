@@ -124,6 +124,28 @@
       </el-form>
     </div>
 
+    <!-- 导入设置 -->
+    <div class="page-card">
+      <h3>导入设置</h3>
+      <el-form label-position="top">
+        <el-form-item label="最大导入字符数">
+          <div class="import-setting-row">
+            <el-input-number
+              v-model="maxImportChars"
+              :min="1000"
+              :max="200000"
+              :step="5000"
+              style="width: 200px"
+            />
+            <el-button type="primary" @click="saveImportSettings" :loading="savingImportSettings">保存</el-button>
+          </div>
+          <div class="form-tip">
+            导入文档时发送给 AI 的最大文本长度。过大可能超出模型上下文窗口导致失败，建议保持默认值。
+          </div>
+        </el-form-item>
+      </el-form>
+    </div>
+
     <!-- 提示词管理 -->
     <div class="page-card">
       <h3>提示词管理</h3>
@@ -214,6 +236,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, ArrowRight } from '@element-plus/icons-vue'
 import { modelApi, promptApi, speechApi, type ModelConfig, type Prompt } from '@/api/config'
+import { importApi } from '@/api/import'
 import { useAppStore } from '@/store/app'
 
 const appStore = useAppStore()
@@ -234,6 +257,10 @@ const availableModels = ref<string[]>([])
 const speechProvider = ref('web_speech')
 const whisperUrl = ref('')
 const whisperKey = ref('')
+
+// 导入设置
+const maxImportChars = ref(30000)
+const savingImportSettings = ref(false)
 
 // 按用途分组模型
 const analyzeModels = computed(() => models.value.filter(m => m.role === 'analyze'))
@@ -434,10 +461,34 @@ async function saveSpeechConfig() {
   }
 }
 
+// 加载导入设置
+async function loadImportSettings() {
+  try {
+    const settings = await importApi.getSettings()
+    maxImportChars.value = settings.max_import_chars
+  } catch (e) {
+    console.error('加载导入设置失败', e)
+  }
+}
+
+// 保存导入设置
+async function saveImportSettings() {
+  savingImportSettings.value = true
+  try {
+    await importApi.updateSettings({ max_import_chars: maxImportChars.value })
+    ElMessage.success('保存成功')
+  } catch (e) {
+    console.error('保存导入设置失败', e)
+  } finally {
+    savingImportSettings.value = false
+  }
+}
+
 onMounted(() => {
   loadModels()
   loadPrompts()
   loadSpeechConfig()
+  loadImportSettings()
 })
 </script>
 
@@ -544,5 +595,11 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
+}
+
+.import-setting-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 </style>

@@ -141,7 +141,7 @@
     </el-dialog>
 
     <!-- 导入弹窗 -->
-    <el-dialog v-model="showImportDialog" title="导入题库" width="90%" style="max-width: 500px">
+    <el-dialog v-model="showImportDialog" title="导入题库" width="90%" style="max-width: 600px" @close="resetImport">
       <el-form label-position="top">
         <el-form-item label="导入类型">
           <el-radio-group v-model="importType">
@@ -149,7 +149,13 @@
             <el-radio label="paper">套卷导入</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="上传文件">
+        <el-form-item label="导入方式">
+          <el-radio-group v-model="importMode">
+            <el-radio label="file">文件上传</el-radio>
+            <el-radio label="text">文本输入</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="importMode === 'file'" label="上传文件">
           <el-upload
             ref="uploadRef"
             :auto-upload="false"
@@ -160,10 +166,23 @@
             <el-button>选择文件 (TXT/PDF)</el-button>
           </el-upload>
         </el-form-item>
+        <el-form-item v-else label="文本内容">
+          <el-input
+            v-model="importTextContent"
+            type="textarea"
+            :rows="10"
+            placeholder="请粘贴题目内容..."
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showImportDialog = false">取消</el-button>
-        <el-button type="primary" @click="doImport" :loading="importing" :disabled="!importFile">
+        <el-button
+          type="primary"
+          @click="doImport"
+          :loading="importing"
+          :disabled="importMode === 'file' ? !importFile : !importTextContent.trim()"
+        >
           开始导入
         </el-button>
       </template>
@@ -215,6 +234,8 @@ const editingQuestion = ref<Question | null>(null)
 const viewingQuestion = ref<Question | null>(null)
 const importType = ref('single')
 const importFile = ref<File | null>(null)
+const importMode = ref('file')
+const importTextContent = ref('')
 const showTimeLimitDialog = ref(false)
 const practiceTimeLimit = ref(15)
 
@@ -330,18 +351,25 @@ function handleFileChange(file: { raw: File }) {
 
 // 执行导入
 async function doImport() {
-  if (!importFile.value) {
-    ElMessage.warning('请选择文件')
-    return
-  }
-
   importing.value = true
   try {
     let result
-    if (importType.value === 'single') {
-      result = await importApi.importSingle(importFile.value)
+    if (importMode.value === 'text') {
+      if (!importTextContent.value.trim()) {
+        ElMessage.warning('请输入文本内容')
+        return
+      }
+      result = await importApi.importText(importTextContent.value, importType.value)
     } else {
-      result = await importApi.importPaper(importFile.value)
+      if (!importFile.value) {
+        ElMessage.warning('请选择文件')
+        return
+      }
+      if (importType.value === 'single') {
+        result = await importApi.importSingle(importFile.value)
+      } else {
+        result = await importApi.importPaper(importFile.value)
+      }
     }
 
     ElMessage.success('导入任务已提交，正在后台处理...')
@@ -354,12 +382,13 @@ async function doImport() {
   } finally {
     importing.value = false
     importFile.value = null
+    importTextContent.value = ''
   }
 }
 
 // 轮询导入状态
 async function pollImportStatus(importId: number) {
-  const maxAttempts = 120 // 最多等待 2 分钟
+  const maxAttempts = 300 // 最多等待 5 分钟
   let attempts = 0
 
   const poll = async () => {
@@ -375,7 +404,20 @@ async function pollImportStatus(importId: number) {
         attempts++
         setTimeout(poll, 1000)
       } else {
-        ElMessage.warning('导入超时，请在历史记录中查看结果')
+        // 超时后再查一次最终状态
+        try {
+          const finalStatus = await importApi.getStatus(importId)
+          if (finalStatus.status === 'success') {
+            ElMessage.success(finalStatus.result_summary || '导入成功')
+            loadQuestions()
+          } else if (finalStatus.status === 'failed') {
+            ElMessage.error(finalStatus.error_message || '导入失败')
+          } else {
+            ElMessage.warning('导入仍在处理中，请稍后在导入历史中查看结果')
+          }
+        } catch {
+          ElMessage.warning('导入超时，请稍后在导入历史中查看结果')
+        }
       }
     } catch (e) {
       console.error('查询导入状态失败', e)
@@ -383,6 +425,12 @@ async function pollImportStatus(importId: number) {
   }
 
   poll()
+}
+
+// 重置导入弹窗
+function resetImport() {
+  importFile.value = null
+  importTextContent.value = ''
 }
 
 // 处理表格选择变化
