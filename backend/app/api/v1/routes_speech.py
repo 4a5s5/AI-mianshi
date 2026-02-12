@@ -114,7 +114,8 @@ async def transcribe_audio(
                 data={
                     "model": config.whisper_model or "whisper-1",
                     "language": "zh",
-                    "response_format": "json"
+                    "response_format": "json",
+                    "prompt": "今天，北京的天气非常好，阳光明媚。"
                 }
             )
 

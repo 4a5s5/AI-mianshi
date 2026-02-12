@@ -563,6 +563,9 @@ function handleRetry() {
     return
   }
 
+  // 生成新的会话ID，避免与上次作答数据混淆
+  practiceStore.paperSessionId = uuidv4()
+
   paperTimer.reset(timeLimit)
   paperTimer.start()
   questionTimer.reset()
@@ -576,6 +579,8 @@ function handleRetry() {
 
   practiceStore.currentQuestionIndex = 0
   isAnalyzing.value = false
+  isStreaming.value = false
+  streamContent.value = ''
   paperAnalysis.value = ''
   step.value = 'practice'
 }
