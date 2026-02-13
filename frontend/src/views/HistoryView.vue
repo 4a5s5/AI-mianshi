@@ -175,7 +175,21 @@ async function loadHistory() {
   try {
     const api = activeTab.value === 'single' ? historyApi.getSingle : historyApi.getPaper
     const data = await api({ page: currentPage.value, page_size: pageSize.value })
-    historyData.value = data.items
+
+    if (activeTab.value === 'paper') {
+      // 套卷模式：后端返回 { [date]: { [session_id]: { paper_title, answers: [...] } } }
+      // 需要展平为 { [date]: Answer[] } 以匹配渲染逻辑
+      const flatGrouped: Record<string, AnswerWithAnalysis[]> = {}
+      for (const [date, sessions] of Object.entries(data.items)) {
+        flatGrouped[date] = []
+        for (const sessionData of Object.values(sessions as Record<string, any>)) {
+          flatGrouped[date].push(...(sessionData.answers || []))
+        }
+      }
+      historyData.value = flatGrouped
+    } else {
+      historyData.value = data.items
+    }
     total.value = data.total
 
     // 加载趋势图
